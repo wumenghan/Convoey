@@ -31,9 +31,11 @@ class NewHandler(web.RequestHandler):
 	
 class UpdateHandler(web.RequestHandler):
 	""" Update marker postition """
+	_user = ""
 	@gen.coroutine
 	def post(self):
 		user = self.get_argument("user")
+		_user = user
 		user_position = self.get_argument("user_position")
 		g_location_infos[user] = json.loads(user_position)
 		g_user = int(self.get_argument("g_user", 0))
@@ -50,9 +52,8 @@ class UpdateHandler(web.RequestHandler):
 	def on_connection_close(self):
 		g_waiters.remove(self._future)
 		self._future.set_result([])
+	#	del g_location_infos[self._user]	
 
-		
-	
 def main():
 	static_path = os.path.join(os.path.dirname(__file__), "static")
 	app = web.Application(
