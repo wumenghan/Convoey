@@ -1,93 +1,91 @@
-var g_num_seen = 0;
+var g_user = 0;
+var g_markers = [];
+var user = prompt("Enter user name");
 $(document).ready(function() { 
-	getLocation();
-	poll();
+	initialize_user();
+	update_user();
 });
 
 
-function getLocation() {
-
+function initialize_user() {
 	if (navigator.geolocation) {
-		navigator.geolocation.getCurrentPosition(initMap, error);
-		//var watchID = navigator.geolocation.watchPosition(showPosition);
-		//navigator.geolocation.watchPosition(initMap,error, optn);
-
-	} else{
-		alert("Geolocation is not supported by this browser");
+		navigator.geolocation.getCurrentPosition(initMap, error);	
 	}
+
+	function initMap (position) {
+		var LatLng = {lat:position.coords.latitude, lng:position.coords.longitude};	
+		var map_div = document.getElementById("map");	
+		// this map object is global, it can be used anywhere
+		window.map = new google.maps.Map(map_div, {
+			center: LatLng,
+			zoom:18
+		});
+		// send user info to server
+		var user_position = JSON.stringify(LatLng)	
+		$.ajax({
+			url:"/10/new_user",
+			type:"POST",
+			data:{user:user, user_position:user_position},
+			success: function(data) {
+				console.log("initialize user success");	
+			}
+		});
+	}
+
 }
 
-function initMap(position) {	
-	var LatLng = {lat:position.coords.latitude, lng:position.coords.longitude};
-
-	console.log(position.coords.latitude, position.coords.longitude)
-	var put_map = document.getElementById("map"); 
-	window.map = new google.maps.Map(put_map, {
-		center: LatLng,
-		zoom:18
-	});
-
-	//var marker = new google.maps.Marker({	
-	//	position: LatLng,
-	//	map:map,
-	//});
-
-	// update center and marker
-	if(navigator.geolocation){
+function update_user() {
+	if (navigator.geolocation) {
 		var optn = {
 			enableHighAccurarcy: true,
-			timeout            : Infinity,
-			maximumAge         : 0
+			timeout: Infinity,
+			maximumAge:0
 		};
-		var user = prompt("Enter user name");
-		navigator.geolocation.watchPosition(function(position){
+		navigator.geolocation.watchPosition(function(position) {
 			var LatLng = {lat:position.coords.latitude, lng:position.coords.longitude};
-			var position = JSON.stringify(LatLng);
+			var user_position = JSON.stringify(LatLng); 
 			map.setCenter(LatLng);
-			//marker.setPosition(LatLng);
-			// use ajax to send location and username to server
 			$.ajax({
-				url:"/10/new",
+				url:"/10/update_user_location",
 				type:"POST",
-				data:{locations:position, user:user}, // user name will be changed in the future
-				success: function(data, text_status, jq_xhr){
-					console.log("success")	
-				},
-				error: function(jq_xhr, text_status, error_thrown) {
-					console.log("ERROR POSTING NEW MESSAGE:", error_thrown);
+				data:{user:user, user_position:user_position, g_user:g_user},
+				success: function(data) {
+					var user_num = Object.keys(data.locations);
+					deleteMarkers()
+					//for (var i = 0; i < user_num; i++) {
+					//	addMarker(data.locations);
+					//}		
+					$.each(data.locations, function(key, val) {
+						addMarker(val);	
+					});
+					setMapOnAll(map);
+					g_user = user_num; 
+					console.log("g_user", g_user);	
 				}
-			});	
-		},error,optn
-		);	
+			});
+		}, error, optn);
 	}
 }
 
-function poll(){
-	$.ajax({
-		url:"/10/update",
-		type:"POST",
-		data:{num_seen:g_num_seen},
-		success: function(data, text_status, jq_xhr) {
-			var i = 0;
-			$.each(data.locations, function(key, val) {
-				var marker = new google.maps.Marker({
-					position:val,
-					label:key,
-					map:map
-				});
-
-				i++;
-			})
-		console.log(i);
-		g_num_seen = i;
-		poll();	
-		}
-	});
-
-
+function error(err) {
+		alert(err)	
 }
 
+function addMarker(location) {
+	var marker = new google.maps.Marker({
+		position:location,
+		map:map	
+	});
+	g_markers.push(marker);
+}
 
-function error(err){
-	alert(err);
+function setMapOnAll(map) {
+	for( var i = 0; i<g_markers.length; i++) {
+		g_markers[i].setMap(map);	
+	}
+}
+
+function deleteMarkers() {
+	setMapOnAll(null);
+	g_markers = [];
 }

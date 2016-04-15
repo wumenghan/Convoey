@@ -14,11 +14,14 @@ class MainHandler(web.RequestHandler):
 		self.render("index.html")
 
 class NewHandler(web.RequestHandler):
+	""" Add new marker """
 	def post(self):
-		location = self.get_argument("locations")
 		user = self.get_argument("user")
-		g_location_infos[user] = json.loads(location)
-		print type(json.loads(location)) 
+		user_position = self.get_argument("user_position")
+		print "new user ", user
+		print "user position", user_position
+		g_location_infos[user] = json.loads(user_position)
+
 		logging.info("Sending new location to %r listeners", len(g_waiters))
 
 		for future in g_waiters:
@@ -26,14 +29,17 @@ class NewHandler(web.RequestHandler):
 
 		g_waiters.clear()
 	
-	
 class UpdateHandler(web.RequestHandler):
+	""" Update marker postition """
 	@gen.coroutine
 	def post(self):
-		num_seen = int(self.get_argument("num_seen", 0))
-		print num_seen
-		print len(g_location_infos)
-		if num_seen == len(g_location_infos):
+		user = self.get_argument("user")
+		user_position = self.get_argument("user_position")
+		g_location_infos[user] = json.loads(user_position)
+		g_user = int(self.get_argument("g_user", 0))
+		print "update postitions ", user_position
+		print "all user ", g_location_infos
+		if g_user == len(g_location_infos):
 			self._future = concurrent.Future()
 			g_waiters.add(self._future)
 			yield self._future
@@ -45,12 +51,14 @@ class UpdateHandler(web.RequestHandler):
 		g_waiters.remove(self._future)
 		self._future.set_result([])
 
+		
+	
 def main():
 	static_path = os.path.join(os.path.dirname(__file__), "static")
 	app = web.Application(
-		[ ((URL_PREFIX+r"/"),			 MainHandler),
-		  ((URL_PREFIX+r"/new"),         NewHandler),
-		  ((URL_PREFIX+r"/update"),      UpdateHandler),
+		[ ((URL_PREFIX+r"/"),			 	  			  MainHandler),
+		  ((URL_PREFIX+r"/new_user"),     	  			  NewHandler),
+		  ((URL_PREFIX+r"/update_user_location"),      	  UpdateHandler),
 		  ((URL_PREFIX+r'/static/(.*)'), web.StaticFileHandler, {'path': static_path}),
 		  ],
 		template_path = os.path.join(os.path.dirname(__file__), "templates"),
