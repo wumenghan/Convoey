@@ -1,8 +1,9 @@
-from tornado import ioloop, web, gen, concurrent
+from tornado import ioloop, web, gen, concurrent, websocket
 import logging, sys, os, json, time
 
-PORT	   = 8010
-URL_PREFIX = r'/%02d'%(PORT % 100)
+PORT	   = 80
+#URL_PREFIX = r'/%02d'%(PORT % 100)
+URL_PREFIX = ""
 DEBUG	   = True
 
 g_location_infos = {} 
@@ -12,6 +13,7 @@ g_waiters = set()
 class MainHandler(web.RequestHandler):
 	def get(self):
 		self.render("index.html")
+
 
 class NewHandler(web.RequestHandler):
 	""" Add new marker """
@@ -29,6 +31,23 @@ class NewHandler(web.RequestHandler):
 
 		g_waiters.clear()
 	
+class WebSocketTest(websocket.WebSocketHandler):
+	def open(self):
+		print "WebSocket opened"
+
+	def on_message(self, message):
+		print "get message from js "+ message
+		data = json.loads(message)
+		user = data["user"]
+		user_position = json.loads(data["user_position"])
+		g_location_infos[user] = user_position
+		print g_location_infos
+		self.write_message(g_location_infos)
+
+	def on_close(self):
+		print "WebSocket closed"
+
+
 class UpdateHandler(web.RequestHandler):
 	""" Update marker postition """
 	_user = ""
@@ -58,6 +77,7 @@ def main():
 	static_path = os.path.join(os.path.dirname(__file__), "static")
 	app = web.Application(
 		[ ((URL_PREFIX+r"/"),			 	  			  MainHandler),
+		  ((URL_PREFIX+r"/ws"),     	  			  	  WebSocketTest),
 		  ((URL_PREFIX+r"/new_user"),     	  			  NewHandler),
 		  ((URL_PREFIX+r"/update_user_location"),      	  UpdateHandler),
 		  ((URL_PREFIX+r'/static/(.*)'), web.StaticFileHandler, {'path': static_path}),
@@ -66,7 +86,7 @@ def main():
 		debug		  = DEBUG,
 	)
 	
-	app.listen(address="127.0.0.1", port=PORT)
+	app.listen(address="0.0.0.0", port=PORT)
 	sys.stderr.write("Starting server at http://serverhost:%d\n"%PORT)
 	ioloop.IOLoop.instance().start()
 
